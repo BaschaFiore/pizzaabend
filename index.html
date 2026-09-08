@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍕 Pizzaabend</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f7f3ee;
+      color: #222;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 42px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      color: #666;
+      margin-bottom: 35px;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 10px;
+      background: #e85d04;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #d94f00;
+    }
+
+    .join {
+      margin-top: 40px;
+      padding-top: 30px;
+      border-top: 1px solid #ddd;
+    }
+
+    input {
+      width: 100%;
+      padding: 15px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>🍕 Pizzaabend</h1>
+
+    <p>Gemeinsam Pizza planen – einfach und unkompliziert.</p>
+
+    <button onclick="createSession()">
+      Pizzaabend erstellen
+    </button>
+
+    <div class="join">
+      <h2>Session beitreten</h2>
+
+      <input
+        type="text"
+        id="sessionCode"
+        placeholder="Session-Code eingeben"
+      >
+
+      <button onclick="joinSession()">
+        Beitreten
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    function createSession() {
+      alert("Hier erstellen wir gleich deinen Pizzaabend.");
+    }
+
+    function joinSession() {
+      alert("Hier können Gäste gleich einer Session beitreten.");
+    }
+  </script>
+
+</body>
+</html>
