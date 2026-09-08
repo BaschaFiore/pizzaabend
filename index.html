@@ -233,7 +233,7 @@
 
 
   // =====================================================
-  // HILFSFUNKTION
+  // HILFSFUNKTIONEN
   // =====================================================
 
   function show(id) {
@@ -321,6 +321,15 @@
 
     currentSession = session;
 
+    // Gastgeber-Session im Browser speichern
+    localStorage.setItem(
+      "pizzaabend_host",
+      JSON.stringify({
+        id: session.id,
+        code: session.code
+      })
+    );
+
     // Ausgewählte Standardzutaten
     const selectedIds = [
       ...document.querySelectorAll(
@@ -335,30 +344,42 @@
 
     if (custom) {
 
-      const emojiMatch = custom.match(/(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u);
+      const emojiMatch = custom.match(
+        /(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u
+      );
 
       let ingredientName = custom;
       let emoji = "";
 
       if (emojiMatch) {
         emoji = emojiMatch[0];
+
         ingredientName =
-          custom.substring(0, custom.length - emoji.length).trim();
+          custom.substring(
+            0,
+            custom.length - emoji.length
+          ).trim();
       }
 
-      const { data: newIngredient } = await db
-        .from("ingredients")
-        .insert({
-          name: ingredientName,
-          emoji: emoji,
-          is_default: false,
-          session_id: session.id
-        })
-        .select()
-        .single();
+      const { data: newIngredient, error: ingredientError } =
+        await db
+          .from("ingredients")
+          .insert({
+            name: ingredientName,
+            emoji: emoji,
+            is_default: false,
+            session_id: session.id
+          })
+          .select()
+          .single();
+
+      if (ingredientError) {
+        console.error(ingredientError);
+      }
 
       if (newIngredient) {
         selectedIds.push(newIngredient.id);
+        currentIngredients.push(newIngredient);
       }
     }
 
@@ -371,6 +392,73 @@
     show("host");
 
     loadPizzas();
+  }
+
+
+  // =====================================================
+  // GASTGEBER NACH NEULADEN WIEDERHERSTELLEN
+  // =====================================================
+
+  async function restoreHostSession() {
+
+    const saved =
+      localStorage.getItem("pizzaabend_host");
+
+    if (!saved) {
+      return false;
+    }
+
+    try {
+
+      const hostData = JSON.parse(saved);
+
+      const { data: session, error } = await db
+        .from("Sessions")
+        .select("*")
+        .eq("id", hostData.id)
+        .eq("code", hostData.code)
+        .single();
+
+      if (error || !session) {
+
+        localStorage.removeItem("pizzaabend_host");
+
+        return false;
+      }
+
+      currentSession = session;
+
+      document.getElementById("hostTitle").textContent =
+        session.name;
+
+      document.getElementById("hostCode").textContent =
+        session.code;
+
+      // Alle Zutaten dieser Session laden
+      const { data: ingredients } = await db
+        .from("ingredients")
+        .select("*")
+        .or(
+          `is_default.eq.true,session_id.eq.${session.id}`
+        )
+        .order("id");
+
+      currentIngredients = ingredients || [];
+
+      show("host");
+
+      await loadPizzas();
+
+      return true;
+
+    } catch (error) {
+
+      console.error(error);
+
+      localStorage.removeItem("pizzaabend_host");
+
+      return false;
+    }
   }
 
 
@@ -406,7 +494,9 @@
     const { data: ingredients } = await db
       .from("ingredients")
       .select("*")
-      .or(`is_default.eq.true,session_id.eq.${data.id}`)
+      .or(
+        `is_default.eq.true,session_id.eq.${data.id}`
+      )
       .order("id");
 
     currentIngredients = ingredients || [];
@@ -469,9 +559,14 @@
         ingredient_id: id
       }));
 
-      await db
-        .from("pizza_ingredients")
-        .insert(rows);
+      const { error: ingredientError } =
+        await db
+          .from("pizza_ingredients")
+          .insert(rows);
+
+      if (ingredientError) {
+        console.error(ingredientError);
+      }
     }
 
     document.getElementById("guestSuccess").innerHTML = `
@@ -494,11 +589,16 @@
 
   async function loadPizzas() {
 
-    const { data: pizzas } = await db
+    const { data: pizzas, error } = await db
       .from("pizzas")
       .select("*")
       .eq("session_id", currentSession.id)
       .order("created_at");
+
+    if (error) {
+      console.error(error);
+      return;
+    }
 
     if (!pizzas) return;
 
@@ -521,11 +621,13 @@
       html += `
         <div class="pizza">
           <strong>${pizza.guest_name}</strong><br>
-          ${ingredients.length
-            ? ingredients.map(i =>
-                `${i.name} ${i.emoji}`
-              ).join(" · ")
-            : "Margherita"}
+          ${
+            ingredients.length
+              ? ingredients.map(i =>
+                  `${i.name} ${i.emoji}`
+                ).join(" · ")
+              : "Margherita"
+          }
         </div>
       `;
     }
@@ -554,22 +656,42 @@
 
 
   // =====================================================
-  // AUTOMATISCHER SESSION-LINK
+  // BEIM START ENTSCHEIDEN:
+  // GAST ODER GASTGEBER?
   // =====================================================
 
-  const params =
-    new URLSearchParams(window.location.search);
+  async function initialize() {
 
-  const urlSession =
-    params.get("session");
+    const params =
+      new URLSearchParams(window.location.search);
 
-  if (urlSession) {
+    const urlSession =
+      params.get("session");
 
-    document.getElementById("joinCode").value =
-      urlSession;
+    // Wenn ein Session-Link vorhanden ist,
+    // immer als Gast öffnen.
+    if (urlSession) {
 
-    joinSession();
+      document.getElementById("joinCode").value =
+        urlSession;
+
+      await joinSession();
+
+      return;
+    }
+
+    // Sonst prüfen, ob dieser Browser
+    // bereits Gastgeber einer Session ist.
+    const restored =
+      await restoreHostSession();
+
+    if (!restored) {
+      show("start");
+    }
   }
+
+
+  initialize();
 
 </script>
 
