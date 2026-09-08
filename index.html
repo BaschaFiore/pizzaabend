@@ -29,7 +29,9 @@
       margin-bottom: 10px;
     }
 
-    h2 { margin-top: 30px; }
+    h2 {
+      margin-top: 30px;
+    }
 
     input {
       width: 100%;
@@ -109,7 +111,9 @@
 
   <h1>🍕 Pizzaabend</h1>
 
+
   <!-- STARTSEITE -->
+
   <div id="start">
 
     <button onclick="showCreate()">
@@ -117,6 +121,7 @@
     </button>
 
     <div class="box">
+
       <h2>Session beitreten</h2>
 
       <input
@@ -128,12 +133,14 @@
       <button onclick="joinSession()">
         Beitreten
       </button>
+
     </div>
 
   </div>
 
 
   <!-- SESSION ERSTELLEN -->
+
   <div id="create" class="hidden">
 
     <h2>Pizzaabend erstellen</h2>
@@ -162,17 +169,21 @@
 
 
   <!-- GASTGEBER -->
+
   <div id="host" class="hidden">
 
     <h2 id="hostTitle"></h2>
 
     <div class="box">
+
       <div>Session-Code:</div>
+
       <div class="code" id="hostCode"></div>
 
       <button onclick="copyLink()">
         🔗 Link kopieren
       </button>
+
     </div>
 
     <h2>🍕 Pizzen</h2>
@@ -183,6 +194,7 @@
 
 
   <!-- GAST -->
+
   <div id="guest" class="hidden">
 
     <h2 id="guestTitle"></h2>
@@ -215,483 +227,754 @@
 
 <script>
 
-  // =====================================================
-  // SUPABASE
-  // =====================================================
+
+// =====================================================
+// SUPABASE
+// =====================================================
 
   const SUPABASE_URL = "https://lckxxinenuiqucvuminb.supabase.co";
   const SUPABASE_KEY = "sb_publishable_Z0E7ZD5LghBMt1eYFi2dEg_fh0hUGV9";
 
-  const db = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
+const db = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+
+let currentSession = null;
+let currentIngredients = [];
+
+
+// =====================================================
+// HILFSFUNKTION
+// =====================================================
+
+function show(id) {
+
+  document.querySelectorAll(".container > div")
+    .forEach(el => el.classList.add("hidden"));
+
+  document.getElementById(id)
+    .classList.remove("hidden");
+}
+
+
+function generateCode() {
+
+  return Math.random()
+    .toString(36)
+    .substring(2, 8)
+    .toUpperCase();
+}
+
+
+// =====================================================
+// SESSION ERSTELLEN – ZUTATEN LADEN
+// =====================================================
+
+async function showCreate() {
+
+  show("create");
+
+  const { data, error } = await db
+    .from("ingredients")
+    .select("*")
+    .eq("is_default", true)
+    .order("id");
+
+  if (error) {
+
+    alert("Fehler beim Laden der Zutaten.");
+
+    console.error(error);
+
+    return;
+  }
+
+  currentIngredients = data;
+
+  document.getElementById("defaultIngredients").innerHTML =
+    data.map(i => `
+      <label class="ingredient">
+
+        <input
+          type="checkbox"
+          value="${i.id}"
+          checked
+        >
+
+        ${i.name} ${i.emoji}
+
+      </label>
+    `).join("");
+}
+
+
+// =====================================================
+// SESSION ERSTELLEN
+// =====================================================
+
+async function createSession() {
+
+  const name =
+    document.getElementById("sessionName")
+      .value.trim();
+
+
+  if (!name) {
+
+    alert(
+      "Bitte gib einen Namen für den Pizzaabend ein."
+    );
+
+    return;
+  }
+
+
+  const code = generateCode();
+
+
+  // Session erstellen
+
+  const {
+    data: session,
+    error
+  } = await db
+    .from("Sessions")
+    .insert({
+      name: name,
+      code: code
+    })
+    .select()
+    .single();
+
+
+  if (error) {
+
+    alert("Session konnte nicht erstellt werden.");
+
+    console.error(error);
+
+    return;
+  }
+
+
+  currentSession = session;
+
+
+  // Gastgeber-Session speichern
+
+  localStorage.setItem(
+    "pizzaabend_host",
+    JSON.stringify({
+      id: session.id,
+      code: session.code
+    })
   );
 
 
-  let currentSession = null;
-  let currentIngredients = [];
+  // ===================================================
+  // AUSGEWÄHLTE STANDARDZUTATEN
+  // ===================================================
+
+  const selectedIds = [
+    ...document.querySelectorAll(
+      "#defaultIngredients input:checked"
+    )
+  ].map(input => Number(input.value));
 
 
-  // =====================================================
-  // HILFSFUNKTIONEN
-  // =====================================================
+  // Standardzutaten für diese Session speichern
 
-  function show(id) {
-    document.querySelectorAll(".container > div")
-      .forEach(el => el.classList.add("hidden"));
+  if (selectedIds.length > 0) {
 
-    document.getElementById(id).classList.remove("hidden");
-  }
-
-
-  function generateCode() {
-    return Math.random()
-      .toString(36)
-      .substring(2, 8)
-      .toUpperCase();
-  }
-
-
-  // =====================================================
-  // START
-  // =====================================================
-
-  async function showCreate() {
-
-    show("create");
-
-    const { data, error } = await db
-      .from("ingredients")
-      .select("*")
-      .eq("is_default", true)
-      .order("id");
-
-    if (error) {
-      alert("Fehler beim Laden der Zutaten.");
-      console.error(error);
-      return;
-    }
-
-    currentIngredients = data;
-
-    document.getElementById("defaultIngredients").innerHTML =
-      data.map(i => `
-        <label class="ingredient">
-          <input
-            type="checkbox"
-            value="${i.id}"
-            checked
-          >
-          ${i.name} ${i.emoji}
-        </label>
-      `).join("");
-  }
-
-
-  // =====================================================
-  // SESSION ERSTELLEN
-  // =====================================================
-
-  async function createSession() {
-
-    const name =
-      document.getElementById("sessionName").value.trim();
-
-    if (!name) {
-      alert("Bitte gib einen Namen für den Pizzaabend ein.");
-      return;
-    }
-
-    const code = generateCode();
-
-    const { data: session, error } = await db
-      .from("Sessions")
-      .insert({
-        name: name,
-        code: code
-      })
-      .select()
-      .single();
-
-    if (error) {
-      alert("Session konnte nicht erstellt werden.");
-      console.error(error);
-      return;
-    }
-
-    currentSession = session;
-
-    // Gastgeber-Session im Browser speichern
-    localStorage.setItem(
-      "pizzaabend_host",
-      JSON.stringify({
-        id: session.id,
-        code: session.code
+    const rows = selectedIds.map(
+      ingredientId => ({
+        session_id: session.id,
+        ingredient_id: ingredientId
       })
     );
 
-    // Ausgewählte Standardzutaten
-    const selectedIds = [
-      ...document.querySelectorAll(
-        "#defaultIngredients input:checked"
-      )
-    ].map(input => Number(input.value));
 
-    // Zusätzliche Zutat
-    const custom =
-      document.getElementById("customIngredient")
-        .value.trim();
+    const {
+      error: sessionIngredientError
+    } = await db
+      .from("session_ingredients")
+      .insert(rows);
 
-    if (custom) {
 
-      const emojiMatch = custom.match(
-        /(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u
+    if (sessionIngredientError) {
+
+      alert(
+        "Die Zutaten konnten nicht gespeichert werden."
       );
 
-      let ingredientName = custom;
-      let emoji = "";
+      console.error(sessionIngredientError);
 
-      if (emojiMatch) {
-        emoji = emojiMatch[0];
+      return;
+    }
+  }
 
-        ingredientName =
-          custom.substring(
+
+  // ===================================================
+  // EIGENE ZUTAT
+  // ===================================================
+
+  const custom =
+    document.getElementById("customIngredient")
+      .value.trim();
+
+
+  if (custom) {
+
+    const emojiMatch = custom.match(
+      /(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u
+    );
+
+
+    let ingredientName = custom;
+    let emoji = "";
+
+
+    if (emojiMatch) {
+
+      emoji = emojiMatch[0];
+
+      ingredientName =
+        custom
+          .substring(
             0,
             custom.length - emoji.length
-          ).trim();
-      }
-
-      const { data: newIngredient, error: ingredientError } =
-        await db
-          .from("ingredients")
-          .insert({
-            name: ingredientName,
-            emoji: emoji,
-            is_default: false,
-            session_id: session.id
-          })
-          .select()
-          .single();
-
-      if (ingredientError) {
-        console.error(ingredientError);
-      }
-
-      if (newIngredient) {
-        selectedIds.push(newIngredient.id);
-        currentIngredients.push(newIngredient);
-      }
+          )
+          .trim();
     }
 
-    document.getElementById("hostTitle").textContent =
-      name;
 
-    document.getElementById("hostCode").textContent =
-      code;
-
-    show("host");
-
-    loadPizzas();
-  }
-
-
-  // =====================================================
-  // GASTGEBER NACH NEULADEN WIEDERHERSTELLEN
-  // =====================================================
-
-  async function restoreHostSession() {
-
-    const saved =
-      localStorage.getItem("pizzaabend_host");
-
-    if (!saved) {
-      return false;
-    }
-
-    try {
-
-      const hostData = JSON.parse(saved);
-
-      const { data: session, error } = await db
-        .from("Sessions")
-        .select("*")
-        .eq("id", hostData.id)
-        .eq("code", hostData.code)
-        .single();
-
-      if (error || !session) {
-
-        localStorage.removeItem("pizzaabend_host");
-
-        return false;
-      }
-
-      currentSession = session;
-
-      document.getElementById("hostTitle").textContent =
-        session.name;
-
-      document.getElementById("hostCode").textContent =
-        session.code;
-
-      // Alle Zutaten dieser Session laden
-      const { data: ingredients } = await db
-        .from("ingredients")
-        .select("*")
-        .or(
-          `is_default.eq.true,session_id.eq.${session.id}`
-        )
-        .order("id");
-
-      currentIngredients = ingredients || [];
-
-      show("host");
-
-      await loadPizzas();
-
-      return true;
-
-    } catch (error) {
-
-      console.error(error);
-
-      localStorage.removeItem("pizzaabend_host");
-
-      return false;
-    }
-  }
-
-
-  // =====================================================
-  // SESSION BEITRETEN
-  // =====================================================
-
-  async function joinSession() {
-
-    const code =
-      document.getElementById("joinCode")
-        .value.trim()
-        .toUpperCase();
-
-    if (!code) return;
-
-    const { data, error } = await db
-      .from("Sessions")
-      .select("*")
-      .eq("code", code)
-      .single();
-
-    if (error || !data) {
-      alert("Session nicht gefunden.");
-      return;
-    }
-
-    currentSession = data;
-
-    document.getElementById("guestTitle").textContent =
-      data.name;
-
-    const { data: ingredients } = await db
+    const {
+      data: newIngredient,
+      error: ingredientError
+    } = await db
       .from("ingredients")
-      .select("*")
-      .or(
-        `is_default.eq.true,session_id.eq.${data.id}`
-      )
-      .order("id");
-
-    currentIngredients = ingredients || [];
-
-    document.getElementById("guestIngredients").innerHTML =
-      currentIngredients.map(i => `
-        <label class="ingredient">
-          <input
-            type="checkbox"
-            value="${i.id}"
-          >
-          ${i.name} ${i.emoji}
-        </label>
-      `).join("");
-
-    show("guest");
-  }
-
-
-  // =====================================================
-  // PIZZA HINZUFÜGEN
-  // =====================================================
-
-  async function addPizza() {
-
-    const guestName =
-      document.getElementById("guestName")
-        .value.trim();
-
-    if (!guestName) {
-      alert("Bitte gib deinen Namen ein.");
-      return;
-    }
-
-    const selectedIds = [
-      ...document.querySelectorAll(
-        "#guestIngredients input:checked"
-      )
-    ].map(input => Number(input.value));
-
-    const { data: pizza, error } = await db
-      .from("pizzas")
       .insert({
-        session_id: currentSession.id,
-        guest_name: guestName
+        name: ingredientName,
+        emoji: emoji,
+        is_default: false,
+        session_id: session.id
       })
       .select()
       .single();
 
-    if (error) {
-      alert("Pizza konnte nicht gespeichert werden.");
-      console.error(error);
+
+    if (ingredientError) {
+
+      alert(
+        "Die zusätzliche Zutat konnte nicht gespeichert werden."
+      );
+
+      console.error(ingredientError);
+
       return;
     }
 
-    if (selectedIds.length > 0) {
 
-      const rows = selectedIds.map(id => ({
+    // Eigene Zutat ebenfalls für diese Session speichern
+
+    const {
+      error: sessionIngredientError
+    } = await db
+      .from("session_ingredients")
+      .insert({
+        session_id: session.id,
+        ingredient_id: newIngredient.id
+      });
+
+
+    if (sessionIngredientError) {
+
+      console.error(sessionIngredientError);
+
+      return;
+    }
+  }
+
+
+  // ===================================================
+  // GASTGEBER-ANSICHT
+  // ===================================================
+
+  document.getElementById("hostTitle")
+    .textContent = name;
+
+  document.getElementById("hostCode")
+    .textContent = code;
+
+
+  show("host");
+
+
+  await loadHostIngredients();
+
+  await loadPizzas();
+}
+
+
+// =====================================================
+// ZUTATEN DER SESSION FÜR GASTGEBER LADEN
+// =====================================================
+
+async function loadHostIngredients() {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("session_ingredients")
+    .select(`
+      ingredient_id,
+      ingredients (*)
+    `)
+    .eq("session_id", currentSession.id);
+
+
+  if (error) {
+
+    console.error(error);
+
+    return;
+  }
+
+
+  currentIngredients =
+    (data || [])
+      .map(row => row.ingredients)
+      .filter(Boolean);
+}
+
+
+// =====================================================
+// GASTGEBER NACH NEULADEN WIEDERHERSTELLEN
+// =====================================================
+
+async function restoreHostSession() {
+
+  const saved =
+    localStorage.getItem("pizzaabend_host");
+
+
+  if (!saved) {
+    return false;
+  }
+
+
+  try {
+
+    const hostData =
+      JSON.parse(saved);
+
+
+    const {
+      data: session,
+      error
+    } = await db
+      .from("Sessions")
+      .select("*")
+      .eq("id", hostData.id)
+      .eq("code", hostData.code)
+      .single();
+
+
+    if (error || !session) {
+
+      localStorage.removeItem(
+        "pizzaabend_host"
+      );
+
+      return false;
+    }
+
+
+    currentSession = session;
+
+
+    document.getElementById("hostTitle")
+      .textContent = session.name;
+
+
+    document.getElementById("hostCode")
+      .textContent = session.code;
+
+
+    await loadHostIngredients();
+
+    show("host");
+
+    await loadPizzas();
+
+
+    return true;
+
+  } catch (error) {
+
+    console.error(error);
+
+    localStorage.removeItem(
+      "pizzaabend_host"
+    );
+
+    return false;
+  }
+}
+
+
+// =====================================================
+// SESSION BEITRETEN
+// =====================================================
+
+async function joinSession() {
+
+  const code =
+    document.getElementById("joinCode")
+      .value.trim()
+      .toUpperCase();
+
+
+  if (!code) {
+    return;
+  }
+
+
+  const {
+    data,
+    error
+  } = await db
+    .from("Sessions")
+    .select("*")
+    .eq("code", code)
+    .single();
+
+
+  if (error || !data) {
+
+    alert("Session nicht gefunden.");
+
+    return;
+  }
+
+
+  currentSession = data;
+
+
+  document.getElementById("guestTitle")
+    .textContent = data.name;
+
+
+  // ===================================================
+  // NUR ZUTATEN DIESER SESSION LADEN
+  // ===================================================
+
+  const {
+    data: sessionIngredients,
+    error: ingredientError
+  } = await db
+    .from("session_ingredients")
+    .select(`
+      ingredient_id,
+      ingredients (*)
+    `)
+    .eq("session_id", data.id);
+
+
+  if (ingredientError) {
+
+    alert(
+      "Die Zutaten konnten nicht geladen werden."
+    );
+
+    console.error(ingredientError);
+
+    return;
+  }
+
+
+  currentIngredients =
+    (sessionIngredients || [])
+      .map(row => row.ingredients)
+      .filter(Boolean);
+
+
+  document.getElementById("guestIngredients")
+    .innerHTML =
+      currentIngredients.map(i => `
+        <label class="ingredient">
+
+          <input
+            type="checkbox"
+            value="${i.id}"
+          >
+
+          ${i.name} ${i.emoji}
+
+        </label>
+      `).join("");
+
+
+  show("guest");
+}
+
+
+// =====================================================
+// PIZZA HINZUFÜGEN
+// =====================================================
+
+async function addPizza() {
+
+  const guestName =
+    document.getElementById("guestName")
+      .value.trim();
+
+
+  if (!guestName) {
+
+    alert("Bitte gib deinen Namen ein.");
+
+    return;
+  }
+
+
+  const selectedIds = [
+    ...document.querySelectorAll(
+      "#guestIngredients input:checked"
+    )
+  ].map(input => Number(input.value));
+
+
+  // Pizza speichern
+
+  const {
+    data: pizza,
+    error
+  } = await db
+    .from("pizzas")
+    .insert({
+      session_id: currentSession.id,
+      guest_name: guestName
+    })
+    .select()
+    .single();
+
+
+  if (error) {
+
+    alert(
+      "Pizza konnte nicht gespeichert werden."
+    );
+
+    console.error(error);
+
+    return;
+  }
+
+
+  // Zutaten speichern
+
+  if (selectedIds.length > 0) {
+
+    const rows =
+      selectedIds.map(id => ({
         pizza_id: pizza.id,
         ingredient_id: id
       }));
 
-      const { error: ingredientError } =
-        await db
-          .from("pizza_ingredients")
-          .insert(rows);
 
-      if (ingredientError) {
-        console.error(ingredientError);
-      }
+    const {
+      error: ingredientError
+    } = await db
+      .from("pizza_ingredients")
+      .insert(rows);
+
+
+    if (ingredientError) {
+
+      console.error(ingredientError);
+
+      alert(
+        "Die Pizza wurde gespeichert, aber die Zutaten konnten nicht gespeichert werden."
+      );
     }
+  }
 
-    document.getElementById("guestSuccess").innerHTML = `
+
+  // Erfolg anzeigen
+
+  document.getElementById("guestSuccess")
+    .innerHTML = `
       <div class="success">
+
         ✅ Pizza hinzugefügt!
+
         <br><br>
+
         Du kannst direkt eine weitere Pizza auswählen.
+
       </div>
     `;
 
-    document.querySelectorAll(
-      "#guestIngredients input"
-    ).forEach(input => input.checked = false);
+
+  // Häkchen entfernen
+
+  document.querySelectorAll(
+    "#guestIngredients input"
+  ).forEach(
+    input => input.checked = false
+  );
+}
+
+
+// =====================================================
+// PIZZEN FÜR GASTGEBER LADEN
+// =====================================================
+
+async function loadPizzas() {
+
+  const {
+    data: pizzas,
+    error
+  } = await db
+    .from("pizzas")
+    .select("*")
+    .eq("session_id", currentSession.id)
+    .order("created_at");
+
+
+  if (error) {
+
+    console.error(error);
+
+    return;
   }
 
 
-  // =====================================================
-  // PIZZEN FÜR GASTGEBER LADEN
-  // =====================================================
+  let html = "";
 
-  async function loadPizzas() {
 
-    const { data: pizzas, error } = await db
-      .from("pizzas")
-      .select("*")
-      .eq("session_id", currentSession.id)
-      .order("created_at");
+  for (const pizza of pizzas || []) {
 
-    if (error) {
-      console.error(error);
-      return;
-    }
 
-    if (!pizzas) return;
+    const {
+      data: links
+    } = await db
+      .from("pizza_ingredients")
+      .select("ingredient_id")
+      .eq("pizza_id", pizza.id);
 
-    let html = "";
 
-    for (const pizza of pizzas) {
+    const ids =
+      (links || [])
+        .map(x => x.ingredient_id);
 
-      const { data: links } = await db
-        .from("pizza_ingredients")
-        .select("ingredient_id")
-        .eq("pizza_id", pizza.id);
 
-      const ids =
-        (links || []).map(x => x.ingredient_id);
+    const ingredients =
+      currentIngredients
+        .filter(i => ids.includes(i.id));
 
-      const ingredients =
-        currentIngredients
-          .filter(i => ids.includes(i.id));
 
-      html += `
-        <div class="pizza">
-          <strong>${pizza.guest_name}</strong><br>
-          ${
-            ingredients.length
-              ? ingredients.map(i =>
+    html += `
+      <div class="pizza">
+
+        <strong>
+          ${pizza.guest_name}
+        </strong>
+
+        <br>
+
+        ${
+          ingredients.length
+            ? ingredients
+                .map(i =>
                   `${i.name} ${i.emoji}`
-                ).join(" · ")
-              : "Margherita"
-          }
-        </div>
-      `;
-    }
+                )
+                .join(" · ")
+            : "Margherita"
+        }
 
-    document.getElementById("pizzaList").innerHTML =
-      html || "Noch keine Pizzen bestellt.";
+      </div>
+    `;
   }
 
 
-  // =====================================================
-  // LINK KOPIEREN
-  // =====================================================
+  document.getElementById("pizzaList")
+    .innerHTML =
+      html ||
+      "Noch keine Pizzen bestellt.";
+}
 
-  function copyLink() {
 
-    const url =
-      window.location.origin +
-      window.location.pathname +
-      "?session=" +
-      currentSession.code;
+// =====================================================
+// LINK KOPIEREN
+// =====================================================
 
-    navigator.clipboard.writeText(url);
+function copyLink() {
 
-    alert("Link kopiert! Du kannst ihn jetzt verschicken.");
+  const url =
+    window.location.origin +
+    window.location.pathname +
+    "?session=" +
+    currentSession.code;
+
+
+  navigator.clipboard.writeText(url);
+
+
+  alert(
+    "Link kopiert! Du kannst ihn jetzt verschicken."
+  );
+}
+
+
+// =====================================================
+// START
+// =====================================================
+
+async function initialize() {
+
+  const params =
+    new URLSearchParams(
+      window.location.search
+    );
+
+
+  const urlSession =
+    params.get("session");
+
+
+  // Link mit ?session=...
+  // immer als Gast öffnen
+
+  if (urlSession) {
+
+    document.getElementById("joinCode")
+      .value = urlSession;
+
+    await joinSession();
+
+    return;
   }
 
 
-  // =====================================================
-  // BEIM START ENTSCHEIDEN:
-  // GAST ODER GASTGEBER?
-  // =====================================================
+  // Gastgeber wiederherstellen
 
-  async function initialize() {
+  const restored =
+    await restoreHostSession();
 
-    const params =
-      new URLSearchParams(window.location.search);
 
-    const urlSession =
-      params.get("session");
+  if (!restored) {
 
-    // Wenn ein Session-Link vorhanden ist,
-    // immer als Gast öffnen.
-    if (urlSession) {
-
-      document.getElementById("joinCode").value =
-        urlSession;
-
-      await joinSession();
-
-      return;
-    }
-
-    // Sonst prüfen, ob dieser Browser
-    // bereits Gastgeber einer Session ist.
-    const restored =
-      await restoreHostSession();
-
-    if (!restored) {
-      show("start");
-    }
+    show("start");
   }
+}
 
 
-  initialize();
+initialize();
 
 </script>
 
