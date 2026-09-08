@@ -972,7 +972,16 @@ async function initialize() {
     show("start");
   }
 }
+setInterval(() => {
 
+  if (
+    currentSession &&
+    !document.getElementById("host").classList.contains("hidden")
+  ) {
+    loadPizzas();
+  }
+
+}, 5000);
 
 initialize();
 
