@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🍕 Pizzaabend</title>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -18,74 +18,111 @@
     }
 
     .container {
-      max-width: 500px;
-      margin: 0 auto;
-      padding: 40px 20px;
-      text-align: center;
+      max-width: 550px;
+      margin: auto;
+      padding: 30px 20px;
     }
 
     h1 {
-      font-size: 42px;
+      text-align: center;
+      font-size: 40px;
       margin-bottom: 10px;
     }
 
-    p {
-      color: #666;
-      margin-bottom: 35px;
+    h2 { margin-top: 30px; }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      margin: 8px 0 15px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 16px;
     }
 
     button {
       width: 100%;
-      padding: 16px;
-      border: none;
+      padding: 15px;
+      border: 0;
       border-radius: 10px;
       background: #e85d04;
       color: white;
-      font-size: 18px;
+      font-size: 17px;
       font-weight: bold;
       cursor: pointer;
+      margin-top: 10px;
     }
 
     button:hover {
       background: #d94f00;
     }
 
-    .join {
-      margin-top: 40px;
-      padding-top: 30px;
-      border-top: 1px solid #ddd;
+    .ingredient {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      margin: 7px 0;
+      background: white;
+      border-radius: 10px;
+      cursor: pointer;
     }
 
-    input {
-      width: 100%;
-      padding: 15px;
-      margin: 10px 0;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      font-size: 16px;
+    .ingredient input {
+      width: auto;
+      margin: 0 12px 0 0;
+    }
+
+    .box {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      margin-top: 20px;
+    }
+
+    .pizza {
+      padding: 15px 0;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .code {
+      font-size: 28px;
+      font-weight: bold;
+      text-align: center;
+      letter-spacing: 4px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .success {
+      text-align: center;
+      font-size: 20px;
+      padding: 20px;
     }
   </style>
 </head>
 
 <body>
 
-  <div class="container">
+<div class="container">
 
-    <h1>🍕 Pizzaabend</h1>
+  <h1>🍕 Pizzaabend</h1>
 
-    <p>Gemeinsam Pizza planen – einfach und unkompliziert.</p>
+  <!-- STARTSEITE -->
+  <div id="start">
 
-    <button onclick="createSession()">
+    <button onclick="showCreate()">
       Pizzaabend erstellen
     </button>
 
-    <div class="join">
+    <div class="box">
       <h2>Session beitreten</h2>
 
       <input
-        type="text"
-        id="sessionCode"
-        placeholder="Session-Code eingeben"
+        id="joinCode"
+        placeholder="Session-Code"
+        maxlength="8"
       >
 
       <button onclick="joinSession()">
@@ -95,15 +132,446 @@
 
   </div>
 
-  <script>
-    function createSession() {
-      alert("Hier erstellen wir gleich deinen Pizzaabend.");
+
+  <!-- SESSION ERSTELLEN -->
+  <div id="create" class="hidden">
+
+    <h2>Pizzaabend erstellen</h2>
+
+    <input
+      id="sessionName"
+      placeholder="Name des Pizzaabends"
+    >
+
+    <h2>Zutaten auswählen</h2>
+
+    <div id="defaultIngredients"></div>
+
+    <h2>Weitere Zutaten</h2>
+
+    <input
+      id="customIngredient"
+      placeholder="z.B. Gorgonzola 🧀"
+    >
+
+    <button onclick="createSession()">
+      🍕 Pizzaabend erstellen
+    </button>
+
+  </div>
+
+
+  <!-- GASTGEBER -->
+  <div id="host" class="hidden">
+
+    <h2 id="hostTitle"></h2>
+
+    <div class="box">
+      <div>Session-Code:</div>
+      <div class="code" id="hostCode"></div>
+
+      <button onclick="copyLink()">
+        🔗 Link kopieren
+      </button>
+    </div>
+
+    <h2>🍕 Pizzen</h2>
+
+    <div id="pizzaList"></div>
+
+  </div>
+
+
+  <!-- GAST -->
+  <div id="guest" class="hidden">
+
+    <h2 id="guestTitle"></h2>
+
+    <div class="box">
+
+      <label>Dein Name</label>
+
+      <input
+        id="guestName"
+        placeholder="z.B. Max"
+      >
+
+      <h2>Deine Pizza</h2>
+
+      <div id="guestIngredients"></div>
+
+      <button onclick="addPizza()">
+        🍕 Pizza hinzufügen
+      </button>
+
+    </div>
+
+    <div id="guestSuccess"></div>
+
+  </div>
+
+</div>
+
+
+<script>
+
+  // =====================================================
+  // SUPABASE
+  // =====================================================
+
+  const SUPABASE_URL = "https://lckxxinenuiqucvuminb.supabase.co/rest/v1/";
+  const SUPABASE_KEY = "sb_publishable_Z0E7ZD5LghBMt1eYFi2dEg_fh0hUGV9";
+
+  const db = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+
+  let currentSession = null;
+  let currentIngredients = [];
+
+
+  // =====================================================
+  // HILFSFUNKTION
+  // =====================================================
+
+  function show(id) {
+    document.querySelectorAll(".container > div")
+      .forEach(el => el.classList.add("hidden"));
+
+    document.getElementById(id).classList.remove("hidden");
+  }
+
+
+  function generateCode() {
+    return Math.random()
+      .toString(36)
+      .substring(2, 8)
+      .toUpperCase();
+  }
+
+
+  // =====================================================
+  // START
+  // =====================================================
+
+  async function showCreate() {
+
+    show("create");
+
+    const { data, error } = await db
+      .from("ingredients")
+      .select("*")
+      .eq("is_default", true)
+      .order("id");
+
+    if (error) {
+      alert("Fehler beim Laden der Zutaten.");
+      console.error(error);
+      return;
     }
 
-    function joinSession() {
-      alert("Hier können Gäste gleich einer Session beitreten.");
+    currentIngredients = data;
+
+    document.getElementById("defaultIngredients").innerHTML =
+      data.map(i => `
+        <label class="ingredient">
+          <input
+            type="checkbox"
+            value="${i.id}"
+            checked
+          >
+          ${i.name} ${i.emoji}
+        </label>
+      `).join("");
+  }
+
+
+  // =====================================================
+  // SESSION ERSTELLEN
+  // =====================================================
+
+  async function createSession() {
+
+    const name =
+      document.getElementById("sessionName").value.trim();
+
+    if (!name) {
+      alert("Bitte gib einen Namen für den Pizzaabend ein.");
+      return;
     }
-  </script>
+
+    const code = generateCode();
+
+    const { data: session, error } = await db
+      .from("Sessions")
+      .insert({
+        name: name,
+        code: code
+      })
+      .select()
+      .single();
+
+    if (error) {
+      alert("Session konnte nicht erstellt werden.");
+      console.error(error);
+      return;
+    }
+
+    currentSession = session;
+
+    // Ausgewählte Standardzutaten
+    const selectedIds = [
+      ...document.querySelectorAll(
+        "#defaultIngredients input:checked"
+      )
+    ].map(input => Number(input.value));
+
+    // Zusätzliche Zutat
+    const custom =
+      document.getElementById("customIngredient")
+        .value.trim();
+
+    if (custom) {
+
+      const emojiMatch = custom.match(/(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u);
+
+      let ingredientName = custom;
+      let emoji = "";
+
+      if (emojiMatch) {
+        emoji = emojiMatch[0];
+        ingredientName =
+          custom.substring(0, custom.length - emoji.length).trim();
+      }
+
+      const { data: newIngredient } = await db
+        .from("ingredients")
+        .insert({
+          name: ingredientName,
+          emoji: emoji,
+          is_default: false,
+          session_id: session.id
+        })
+        .select()
+        .single();
+
+      if (newIngredient) {
+        selectedIds.push(newIngredient.id);
+      }
+    }
+
+    document.getElementById("hostTitle").textContent =
+      name;
+
+    document.getElementById("hostCode").textContent =
+      code;
+
+    show("host");
+
+    loadPizzas();
+  }
+
+
+  // =====================================================
+  // SESSION BEITRETEN
+  // =====================================================
+
+  async function joinSession() {
+
+    const code =
+      document.getElementById("joinCode")
+        .value.trim()
+        .toUpperCase();
+
+    if (!code) return;
+
+    const { data, error } = await db
+      .from("Sessions")
+      .select("*")
+      .eq("code", code)
+      .single();
+
+    if (error || !data) {
+      alert("Session nicht gefunden.");
+      return;
+    }
+
+    currentSession = data;
+
+    document.getElementById("guestTitle").textContent =
+      data.name;
+
+    const { data: ingredients } = await db
+      .from("ingredients")
+      .select("*")
+      .or(`is_default.eq.true,session_id.eq.${data.id}`)
+      .order("id");
+
+    currentIngredients = ingredients || [];
+
+    document.getElementById("guestIngredients").innerHTML =
+      currentIngredients.map(i => `
+        <label class="ingredient">
+          <input
+            type="checkbox"
+            value="${i.id}"
+          >
+          ${i.name} ${i.emoji}
+        </label>
+      `).join("");
+
+    show("guest");
+  }
+
+
+  // =====================================================
+  // PIZZA HINZUFÜGEN
+  // =====================================================
+
+  async function addPizza() {
+
+    const guestName =
+      document.getElementById("guestName")
+        .value.trim();
+
+    if (!guestName) {
+      alert("Bitte gib deinen Namen ein.");
+      return;
+    }
+
+    const selectedIds = [
+      ...document.querySelectorAll(
+        "#guestIngredients input:checked"
+      )
+    ].map(input => Number(input.value));
+
+    const { data: pizza, error } = await db
+      .from("pizzas")
+      .insert({
+        session_id: currentSession.id,
+        guest_name: guestName
+      })
+      .select()
+      .single();
+
+    if (error) {
+      alert("Pizza konnte nicht gespeichert werden.");
+      console.error(error);
+      return;
+    }
+
+    if (selectedIds.length > 0) {
+
+      const rows = selectedIds.map(id => ({
+        pizza_id: pizza.id,
+        ingredient_id: id
+      }));
+
+      await db
+        .from("pizza_ingredients")
+        .insert(rows);
+    }
+
+    document.getElementById("guestSuccess").innerHTML = `
+      <div class="success">
+        ✅ Pizza hinzugefügt!
+        <br><br>
+        Du kannst direkt eine weitere Pizza auswählen.
+      </div>
+    `;
+
+    document.querySelectorAll(
+      "#guestIngredients input"
+    ).forEach(input => input.checked = false);
+  }
+
+
+  // =====================================================
+  // PIZZEN FÜR GASTGEBER LADEN
+  // =====================================================
+
+  async function loadPizzas() {
+
+    const { data: pizzas } = await db
+      .from("pizzas")
+      .select("*")
+      .eq("session_id", currentSession.id)
+      .order("created_at");
+
+    if (!pizzas) return;
+
+    let html = "";
+
+    for (const pizza of pizzas) {
+
+      const { data: links } = await db
+        .from("pizza_ingredients")
+        .select("ingredient_id")
+        .eq("pizza_id", pizza.id);
+
+      const ids =
+        (links || []).map(x => x.ingredient_id);
+
+      const ingredients =
+        currentIngredients
+          .filter(i => ids.includes(i.id));
+
+      html += `
+        <div class="pizza">
+          <strong>${pizza.guest_name}</strong><br>
+          ${ingredients.length
+            ? ingredients.map(i =>
+                `${i.name} ${i.emoji}`
+              ).join(" · ")
+            : "Margherita"}
+        </div>
+      `;
+    }
+
+    document.getElementById("pizzaList").innerHTML =
+      html || "Noch keine Pizzen bestellt.";
+  }
+
+
+  // =====================================================
+  // LINK KOPIEREN
+  // =====================================================
+
+  function copyLink() {
+
+    const url =
+      window.location.origin +
+      window.location.pathname +
+      "?session=" +
+      currentSession.code;
+
+    navigator.clipboard.writeText(url);
+
+    alert("Link kopiert! Du kannst ihn jetzt verschicken.");
+  }
+
+
+  // =====================================================
+  // AUTOMATISCHER SESSION-LINK
+  // =====================================================
+
+  const params =
+    new URLSearchParams(window.location.search);
+
+  const urlSession =
+    params.get("session");
+
+  if (urlSession) {
+
+    document.getElementById("joinCode").value =
+      urlSession;
+
+    joinSession();
+  }
+
+</script>
 
 </body>
 </html>
