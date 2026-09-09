@@ -154,16 +154,21 @@
 
     <div id="defaultIngredients"></div>
 
-    <h2>Weitere Zutaten</h2>
+   <h2>Weitere Zutaten</h2>
 
-    <input
-      id="customIngredient"
-      placeholder="z.B. Gorgonzola 🧀"
-    >
+<div id="customIngredients"></div>
 
-    <button onclick="createSession()">
-      🍕 Pizzaabend erstellen
-    </button>
+<button
+  type="button"
+  onclick="addCustomIngredientField()"
+  style="background:#777;"
+>
+  ➕ Weitere Zutat hinzufügen
+</button>
+
+<button onclick="createSession()">
+  🍕 Pizzaabend erstellen
+</button>
 
   </div>
 
@@ -814,7 +819,7 @@ async function addPizza() {
 
         <br><br>
 
-        Du kannst direkt eine weitere Pizza auswählen.
+        Du kannst direkt eine  Pizza auswählen.
 
       </div>
     `;
