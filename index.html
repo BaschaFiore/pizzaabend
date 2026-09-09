@@ -358,11 +358,11 @@ let currentIngredients = [];
 
 function show(id) {
 
-  document
-    .querySelectorAll(".container > div")
-    .forEach(el =>
-      el.classList.add("hidden")
-    );
+document
+  .querySelectorAll(".container > div:not(.signature)")
+  .forEach(el =>
+    el.classList.add("hidden")
+  );
 
 
   document
