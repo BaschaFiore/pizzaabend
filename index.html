@@ -141,6 +141,20 @@
 
   <!-- SESSION ERSTELLEN -->
 
+function addCustomIngredientField() {
+
+  const container =
+    document.getElementById("customIngredients");
+
+  const input = document.createElement("input");
+
+  input.type = "text";
+  input.className = "customIngredient";
+  input.placeholder = "z.B. Gorgonzola 🧀";
+
+  container.appendChild(input);
+}
+  
   <div id="create" class="hidden">
 
     <h2>Pizzaabend erstellen</h2>
@@ -422,66 +436,87 @@ async function createSession() {
 
 
   // ===================================================
-  // EIGENE ZUTAT
-  // ===================================================
+// EIGENE ZUTATEN
+// ===================================================
 
-  const custom =
-    document.getElementById("customIngredient")
-      .value.trim();
+const customInputs =
+  document.querySelectorAll(".customIngredient");
 
+for (const input of customInputs) {
 
-  if (custom) {
+  const custom = input.value.trim();
 
-    const emojiMatch = custom.match(
-      /(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u
+  if (!custom) {
+    continue;
+  }
+
+  const emojiMatch = custom.match(
+    /(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u
+  );
+
+  let ingredientName = custom;
+  let emoji = "";
+
+  if (emojiMatch) {
+
+    emoji = emojiMatch[0];
+
+    ingredientName =
+      custom
+        .substring(
+          0,
+          custom.length - emoji.length
+        )
+        .trim();
+  }
+
+  const {
+    data: newIngredient,
+    error: ingredientError
+  } = await db
+    .from("ingredients")
+    .insert({
+      name: ingredientName,
+      emoji: emoji,
+      is_default: false,
+      session_id: session.id
+    })
+    .select()
+    .single();
+
+  if (ingredientError) {
+
+    alert(
+      "Die zusätzliche Zutat konnte nicht gespeichert werden."
     );
 
+    console.error(ingredientError);
 
-    let ingredientName = custom;
-    let emoji = "";
+    return;
+  }
 
+  // Eigene Zutat dieser Session zuordnen
 
-    if (emojiMatch) {
+  const {
+    error: sessionIngredientError
+  } = await db
+    .from("session_ingredients")
+    .insert({
+      session_id: session.id,
+      ingredient_id: newIngredient.id
+    });
 
-      emoji = emojiMatch[0];
+  if (sessionIngredientError) {
 
-      ingredientName =
-        custom
-          .substring(
-            0,
-            custom.length - emoji.length
-          )
-          .trim();
-    }
+    console.error(sessionIngredientError);
 
+    alert(
+      "Die zusätzliche Zutat konnte der Session nicht zugeordnet werden."
+    );
 
-    const {
-      data: newIngredient,
-      error: ingredientError
-    } = await db
-      .from("ingredients")
-      .insert({
-        name: ingredientName,
-        emoji: emoji,
-        is_default: false,
-        session_id: session.id
-      })
-      .select()
-      .single();
-
-
-    if (ingredientError) {
-
-      alert(
-        "Die zusätzliche Zutat konnte nicht gespeichert werden."
-      );
-
-      console.error(ingredientError);
-
-      return;
-    }
-
-
+    return;
+  }
+}
     // Eigene Zutat ebenfalls für diese Session speichern
 
     const {
